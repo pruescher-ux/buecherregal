@@ -388,11 +388,13 @@
 
   <!-- Toast Notification -->
   <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 bg-slate-900 text-white text-xs sm:text-sm px-4 py-3 rounded-xl shadow-lg border border-slate-800 pointer-events-none">
-    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+    <div id="toast-icon-wrapper">
+      <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+    </div>
     <span id="toast-message">Meldung</span>
   </div>
 
-  <!-- JavaScript Logic -->
-  <script src="app.js"></script>
+  <!-- JavaScript Logic (mit Cache-Busting) -->
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>

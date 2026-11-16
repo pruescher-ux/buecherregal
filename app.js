@@ -232,13 +232,21 @@ async function searchGoogleBooks(query, searchField) {
 // Open Library Suche
 async function searchOpenLibrary(query, searchField) {
   let param = 'q';
-  if (searchField === 'title') param = 'title';
-  else if (searchField === 'author') param = 'author';
-  else if (searchField === 'isbn') param = 'isbn';
+  let cleanQuery = query.trim();
 
-  const url = `https://openlibrary.org/search.json?${param}=${encodeURIComponent(query)}&limit=16`;
+  // Bindestriche und Leerzeichen entfernen, wenn es sich um eine ISBN handelt
+  if (searchField === 'isbn' || (/^[0-9xX\-]+$/.test(cleanQuery) && cleanQuery.replace(/[-\s]/g, '').length >= 9)) {
+    param = 'isbn';
+    cleanQuery = cleanQuery.replace(/[-\s]/g, '');
+  } else if (searchField === 'title') {
+    param = 'title';
+  } else if (searchField === 'author') {
+    param = 'author';
+  }
+
+  const url = `https://openlibrary.org/search.json?${param}=${encodeURIComponent(cleanQuery)}&limit=16`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Open Library API fehlgeschlagen');
+  if (!res.ok) throw new Error(`Open Library API antwortet mit Status ${res.status}`);
   const data = await res.json();
 
   if (!data.docs || data.docs.length === 0) return [];
@@ -770,16 +778,29 @@ function loadSampleData() {
 function showToast(message, isError = false) {
   const toast = document.getElementById('toast');
   const msgEl = document.getElementById('toast-message');
+  const iconWrapper = document.getElementById('toast-icon-wrapper');
   if (!toast || !msgEl) return;
 
   msgEl.textContent = message;
-  toast.classList.remove('translate-y-20', 'opacity-0');
-  toast.classList.add('translate-y-0', 'opacity-100');
+
+  if (iconWrapper) {
+    if (isError) {
+      iconWrapper.innerHTML = '<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400"></i>';
+      toast.className = 'fixed bottom-5 right-5 z-50 transform transition-all duration-300 flex items-center gap-2 bg-slate-900 text-rose-200 text-xs sm:text-sm px-4 py-3 rounded-xl shadow-lg border border-rose-900/50 pointer-events-none translate-y-0 opacity-100';
+    } else {
+      iconWrapper.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>';
+      toast.className = 'fixed bottom-5 right-5 z-50 transform transition-all duration-300 flex items-center gap-2 bg-slate-900 text-white text-xs sm:text-sm px-4 py-3 rounded-xl shadow-lg border border-slate-800 pointer-events-none translate-y-0 opacity-100';
+    }
+    lucide.createIcons();
+  } else {
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    toast.classList.add('translate-y-0', 'opacity-100');
+  }
 
   setTimeout(() => {
     toast.classList.remove('translate-y-0', 'opacity-100');
     toast.classList.add('translate-y-20', 'opacity-0');
-  }, 2800);
+  }, isError ? 4000 : 2800);
 }
 
 // --- HELPER ---
