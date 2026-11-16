@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mein Bücher-Tracker</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-800">
+
+  <!-- Header & Navigation -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900 leading-none">Bücher-Tracker</h1>
+            <p class="text-xs text-slate-500 mt-0.5">Leseliste & Gelesene Bücher</p>
+          </div>
+        </div>
+
+        <!-- Desktop Navigation Tabs -->
+        <nav class="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+          <button id="nav-want-to-read" onclick="switchTab('wantToRead')" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-700 hover:text-slate-900">
+            <i data-lucide="bookmark" class="w-4 h-4 text-amber-500"></i>
+            <span>Leseliste</span>
+            <span id="badge-want-to-read" class="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+          </button>
+          <button id="nav-read" onclick="switchTab('read')" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-700 hover:text-slate-900">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>
+            <span>Gelesen</span>
+            <span id="badge-read" class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+          </button>
+          <button id="nav-search" onclick="switchTab('search')" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-700 hover:text-slate-900">
+            <i data-lucide="search" class="w-4 h-4 text-sky-500"></i>
+            <span>Buch suchen</span>
+          </button>
+        </nav>
+
+        <!-- Action Buttons (Backup / Add) -->
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('backupModal')" title="Daten exportieren / importieren" class="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+            <i data-lucide="database" class="w-5 h-5"></i>
+          </button>
+          <button onclick="switchTab('search')" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-sm shadow-sky-600/30 transition-colors">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Neues Buch</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Nav Bar (Bottom pinned or top tabs) -->
+    <div class="md:hidden flex border-t border-slate-200 bg-white">
+      <button onclick="switchTab('wantToRead')" class="flex-1 py-2.5 text-xs font-medium text-center flex flex-col items-center gap-1 border-r border-slate-100" id="m-nav-want-to-read">
+        <i data-lucide="bookmark" class="w-4 h-4 text-amber-500"></i>
+        <span>Leseliste (<span id="m-badge-want-to-read">0</span>)</span>
+      </button>
+      <button onclick="switchTab('read')" class="flex-1 py-2.5 text-xs font-medium text-center flex flex-col items-center gap-1 border-r border-slate-100" id="m-nav-read">
+        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>
+        <span>Gelesen (<span id="m-badge-read">0</span>)</span>
+      </button>
+      <button onclick="switchTab('search')" class="flex-1 py-2.5 text-xs font-medium text-center flex flex-col items-center gap-1" id="m-nav-search">
+        <i data-lucide="search" class="w-4 h-4 text-sky-500"></i>
+        <span>Suchen</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- SEARCH VIEW -->
+    <section id="view-search" class="space-y-6 hidden">
+      <div class="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+        <div class="max-w-2xl">
+          <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Buchdatenbank durchsuchen</h2>
+          <p class="text-sm text-slate-500 mt-1">
+            Finde Bücher nach Titel, Autor oder ISBN. Wähle anschließend aus, ob du es auf die Leseliste oder direkt zu den gelesenen Büchern hinzufügen möchtest.
+          </p>
+        </div>
+
+        <form id="search-form" onsubmit="handleSearch(event)" class="mt-6 space-y-4">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+              <input
+                id="search-input"
+                type="text"
+                placeholder="z. B. Der Steppenwolf, Hermann Hesse oder 978-3518366752"
+                class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm shadow-sm"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              id="search-submit-btn"
+              class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-medium text-sm transition-all shadow-sm"
+            >
+              <span>Suchen</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-4 pt-2 text-xs text-slate-600">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-700">Suchfilter:</span>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="searchField" value="all" checked class="text-sky-600 focus:ring-sky-500">
+                <span>Alle</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="searchField" value="title" class="text-sky-600 focus:ring-sky-500">
+                <span>Titel</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="searchField" value="author" class="text-sky-600 focus:ring-sky-500">
+                <span>Autor</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="searchField" value="isbn" class="text-sky-600 focus:ring-sky-500">
+                <span>ISBN</span>
+              </label>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-700">Quelle:</span>
+              <select id="search-source" class="border border-slate-300 rounded-lg px-2 py-1 text-xs bg-white text-slate-700 focus:ring-sky-500">
+                <option value="google">Google Books API (Empfohlen für dt. Titel)</option>
+                <option value="openlibrary">Open Library API (Frei & Open Source)</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Search State / Results -->
+      <div id="search-loading" class="hidden text-center py-16">
+        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-sky-600 border-t-transparent"></div>
+        <p class="text-sm text-slate-500 mt-3 font-medium">Bücher werden gesucht...</p>
+      </div>
+
+      <div id="search-empty" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
+        <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-3">
+          <i data-lucide="book-x" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-base font-semibold text-slate-800">Keine Bücher gefunden</h3>
+        <p class="text-sm text-slate-500 mt-1 max-w-sm mx-auto">Überprüfe die Schreibweise oder wechsle zwischen Google Books und Open Library.</p>
+      </div>
+
+      <div id="search-results-container" class="space-y-4">
+        <!-- Results inject here -->
+      </div>
+    </section>
+
+
+    <!-- LIST VIEWS (Want to Read / Read) -->
+    <section id="view-list" class="space-y-6">
+      <!-- Section Header & Filter -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+          <h2 id="list-title" class="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <!-- Title icon & text via JS -->
+          </h2>
+          <p id="list-subtitle" class="text-sm text-slate-500 mt-0.5"></p>
+        </div>
+
+        <!-- Filter & Search in current list -->
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <i data-lucide="filter" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input
+              id="list-search-input"
+              oninput="renderCurrentList()"
+              type="text"
+              placeholder="In dieser Liste filtern..."
+              class="pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white shadow-sm w-48 sm:w-60"
+            />
+          </div>
+          <select id="list-sort-select" onchange="renderCurrentList()" class="border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs bg-white text-slate-700 shadow-sm focus:ring-sky-500">
+            <option value="date-desc">Neueste zuerst</option>
+            <option value="date-asc">Älteste zuerst</option>
+            <option value="title-asc">Titel (A-Z)</option>
+            <option value="rating-desc">Beste Bewertung</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Books Grid / List -->
+      <div id="books-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Cards injected via JS -->
+      </div>
+
+      <!-- Empty State for List -->
+      <div id="list-empty-state" class="hidden text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
+        <div id="list-empty-icon" class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="bookmark" class="w-7 h-7"></i>
+        </div>
+        <h3 id="list-empty-title" class="text-lg font-bold text-slate-900">Deine Leseliste ist noch leer</h3>
+        <p id="list-empty-text" class="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+          Nutze die Suche, um nach Titeln, Autoren oder ISBNs zu suchen und spannende Bücher hinzuzufügen.
+        </p>
+        <div class="mt-6 flex flex-wrap justify-center gap-3">
+          <button onclick="switchTab('search')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white font-medium text-sm hover:bg-sky-700 shadow-sm transition-all">
+            <i data-lucide="search" class="w-4 h-4"></i>
+            <span>Jetzt Bücher suchen</span>
+          </button>
+          <button onclick="loadSampleData()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-medium text-sm hover:bg-slate-50 transition-all">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
+            <span>Beispieldaten laden</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- EDIT / COMMENT MODAL -->
+  <div id="editModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-900" id="edit-modal-title">Buch bearbeiten</h3>
+        <button onclick="closeModal('editModal')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="edit-form" onsubmit="saveBookEdits(event)" class="space-y-4">
+        <input type="hidden" id="edit-book-id">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Status / Liste</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/50">
+              <input type="radio" name="editStatus" value="wantToRead" id="status-want-to-read" class="text-amber-500 focus:ring-amber-500">
+              <span class="text-sm font-medium text-slate-800">Leseliste</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/50">
+              <input type="radio" name="editStatus" value="read" id="status-read" class="text-emerald-500 focus:ring-emerald-500">
+              <span class="text-sm font-medium text-slate-800">Gelesen</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Deine Bewertung (1-5 Sterne)</label>
+          <div class="flex items-center gap-1.5" id="rating-stars">
+            <!-- 5 stars -->
+            <button type="button" onclick="setRating(1)" class="star-btn text-slate-300 hover:text-amber-400 p-1"><i data-lucide="star" class="w-6 h-6"></i></button>
+            <button type="button" onclick="setRating(2)" class="star-btn text-slate-300 hover:text-amber-400 p-1"><i data-lucide="star" class="w-6 h-6"></i></button>
+            <button type="button" onclick="setRating(3)" class="star-btn text-slate-300 hover:text-amber-400 p-1"><i data-lucide="star" class="w-6 h-6"></i></button>
+            <button type="button" onclick="setRating(4)" class="star-btn text-slate-300 hover:text-amber-400 p-1"><i data-lucide="star" class="w-6 h-6"></i></button>
+            <button type="button" onclick="setRating(5)" class="star-btn text-slate-300 hover:text-amber-400 p-1"><i data-lucide="star" class="w-6 h-6"></i></button>
+            <button type="button" onclick="setRating(0)" class="text-xs text-slate-400 hover:text-slate-600 ml-2">Zurücksetzen</button>
+          </div>
+          <input type="hidden" id="edit-rating" value="0">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Dein persönlicher Kommentar / Notiz</label>
+          <textarea
+            id="edit-comment"
+            rows="4"
+            placeholder="Was hat dir gefallen? Gedanken, Lieblingszitate oder Erkenntnisse..."
+            class="w-full p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:outline-none text-sm"
+          ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Zusammenfassung (Klappentext)</label>
+          <textarea
+            id="edit-summary"
+            rows="3"
+            placeholder="Kurzbeschreibung des Buchinhalts..."
+            class="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-600 focus:ring-2 focus:ring-sky-500 focus:outline-none bg-slate-50"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <button type="button" onclick="deleteCurrentEditingBook()" class="text-red-600 hover:text-red-700 text-xs font-medium flex items-center gap-1">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span>Buch löschen</span>
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeModal('editModal')" class="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+              Abbrechen
+            </button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-sm">
+              Speichern
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BACKUP / EXPORT / IMPORT MODAL -->
+  <div id="backupModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="database" class="w-5 h-5 text-sky-600"></i>
+          <span>Datensicherung & Transfer</span>
+        </h3>
+        <button onclick="closeModal('backupModal')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500">
+        Deine Bücherlisten werden sicher im lokalen Speicher deines Browsers aufbewahrt. Mit dem Export kannst du jederzeit eine Sicherungskopie erstellen oder deine Liste auf ein anderes Gerät übertragen.
+      </p>
+
+      <div class="space-y-3">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+          <div>
+            <div class="text-xs font-semibold text-slate-800">Bücher exportieren</div>
+            <div class="text-[11px] text-slate-500">Als .json Datei herunterladen</div>
+          </div>
+          <button onclick="exportData()" class="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 shadow-sm flex items-center gap-1.5">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Exportieren</span>
+          </button>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+          <div class="text-xs font-semibold text-slate-800">Bücher importieren</div>
+          <div class="text-[11px] text-slate-500">Lade eine zuvor exportierte .json Datei hoch</div>
+          <input type="file" id="import-file-input" accept=".json" class="block w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer" onchange="importData(event)" />
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex justify-end">
+        <button onclick="closeModal('backupModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium">
+          Schließen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 bg-slate-900 text-white text-xs sm:text-sm px-4 py-3 rounded-xl shadow-lg border border-slate-800 pointer-events-none">
+    <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toast-message">Meldung</span>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
