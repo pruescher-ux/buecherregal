@@ -18,8 +18,27 @@ document.addEventListener('DOMContentLoaded', () => {
   loadFromStorage();
   updateBadgeCounts();
   switchTab('wantToRead');
+  
+  // Gespeicherten Google API Key laden (falls vorhanden)
+  const savedApiKey = localStorage.getItem('google_books_api_key') || '';
+  const apiKeyInput = document.getElementById('google-api-key-input');
+  if (apiKeyInput) apiKeyInput.value = savedApiKey;
+
   lucide.createIcons();
 });
+
+function saveApiKey() {
+  const input = document.getElementById('google-api-key-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (val) {
+    localStorage.setItem('google_books_api_key', val);
+    showToast('API-Schlüssel gespeichert!');
+  } else {
+    localStorage.removeItem('google_books_api_key');
+    showToast('API-Schlüssel entfernt.');
+  }
+}
 
 // --- LOCAL STORAGE & STATE ---
 function loadFromStorage() {
@@ -132,7 +151,15 @@ async function handleSearch(event) {
   try {
     let items = [];
     if (source === 'google') {
-      items = await searchGoogleBooks(query, searchField);
+      try {
+        items = await searchGoogleBooks(query, searchField);
+      } catch (gErr) {
+        console.warn('Google Books fehlgeschlagen, wechsle automatisch zu Open Library:', gErr);
+        showToast('Google Books API überlastet/blockiert. Suche über Open Library...');
+        const sourceSelect = document.getElementById('search-source');
+        if (sourceSelect) sourceSelect.value = 'openlibrary';
+        items = await searchOpenLibrary(query, searchField);
+      }
     } else {
       items = await searchOpenLibrary(query, searchField);
     }
@@ -162,9 +189,17 @@ async function searchGoogleBooks(query, searchField) {
   else if (searchField === 'author') q = `inauthor:${query}`;
   else if (searchField === 'isbn') q = `isbn:${query}`;
 
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=16`;
+  const apiKey = localStorage.getItem('google_books_api_key') || '';
+  let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=16`;
+  if (apiKey) {
+    url += `&key=${encodeURIComponent(apiKey)}`;
+  }
+
   const res = await fetch(url);
-  if (!res.ok) throw new Error('API-Anfrage fehlgeschlagen');
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Google Books API Fehler: HTTP ${res.status}`);
+  }
   const data = await res.json();
 
   if (!data.items || data.items.length === 0) return [];
@@ -181,6 +216,7 @@ async function searchGoogleBooks(query, searchField) {
 
     return {
       sourceId: item.id,
+      workKey: null,
       title: info.title || 'Ohne Titel',
       authors: (info.authors && info.authors.length) ? info.authors.join(', ') : 'Unbekannter Autor',
       publishYear: info.publishedDate ? info.publishedDate.substring(0, 4) : 'K.A.',
@@ -209,16 +245,33 @@ async function searchOpenLibrary(query, searchField) {
 
   return data.docs.map(doc => {
     const isbn = (doc.isbn && doc.isbn[0]) ? doc.isbn[0] : 'Keine ISBN';
-    const coverUrl = doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : '';
+    let coverUrl = '';
+    if (doc.cover_i) {
+      coverUrl = `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`;
+    } else if (doc.isbn && doc.isbn[0]) {
+      coverUrl = `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-M.jpg`;
+    }
+
+    let summary = 'Klassiker aus der Open Library Datenbank.';
+    if (doc.first_sentence) {
+      summary = Array.isArray(doc.first_sentence) ? doc.first_sentence[0] : doc.first_sentence;
+    } else if (doc.subtitle) {
+      summary = doc.subtitle;
+    }
+
+    const year = doc.first_publish_year
+      ? String(doc.first_publish_year)
+      : (doc.publish_year && doc.publish_year[0] ? String(doc.publish_year[0]) : 'K.A.');
 
     return {
       sourceId: doc.key,
+      workKey: doc.key,
       title: doc.title || 'Ohne Titel',
       authors: (doc.author_name && doc.author_name.length) ? doc.author_name.join(', ') : 'Unbekannter Autor',
-      publishYear: doc.first_publish_year ? String(doc.first_publish_year) : 'K.A.',
+      publishYear: year,
       isbn: isbn,
       coverUrl: coverUrl,
-      summary: doc.first_sentence ? doc.first_sentence[0] : 'Aus Open Library erfasst.',
+      summary: summary,
       pageCount: doc.number_of_pages_median || null,
       categories: ''
     };
@@ -296,8 +349,9 @@ function addSearchResult(resultIndex, status) {
   const item = state.searchResults[resultIndex];
   if (!item) return;
 
+  const bookId = 'book_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
   const newBook = {
-    id: 'book_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    id: bookId,
     title: item.title,
     authors: item.authors,
     publishYear: item.publishYear,
@@ -315,6 +369,31 @@ function addSearchResult(resultIndex, status) {
 
   showToast(`„${item.title}“ wurde hinzugefügt!`);
   renderSearchResults(state.searchResults);
+
+  // Falls es sich um ein Open Library Buch handelt, versuche ausführlichen Klappentext nachzuladen
+  if (item.workKey && item.workKey.startsWith('/works/')) {
+    fetch(`https://openlibrary.org${item.workKey}.json`)
+      .then(res => res.json())
+      .then(data => {
+        let desc = '';
+        if (typeof data.description === 'string') {
+          desc = data.description;
+        } else if (data.description && typeof data.description.value === 'string') {
+          desc = data.description.value;
+        }
+        if (desc) {
+          const target = state.books.find(b => b.id === bookId);
+          if (target) {
+            target.summary = desc;
+            saveToStorage();
+            if (state.activeTab !== 'search') {
+              renderCurrentList();
+            }
+          }
+        }
+      })
+      .catch(e => console.log('Hintergrund-Zusammenfassung übersprungen:', e));
+  }
 }
 
 // --- LISTEN DARSTELLUNG (Leseliste / Gelesen) ---
